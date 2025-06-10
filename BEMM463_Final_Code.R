@@ -1,90 +1,87 @@
+# ----------------------------------------------------
 # BEMM463 Final Report - R Script
 # Candidate Number: 740054869
-# Script to perform clustering analysis and segmentation for Chestnut Ridge case study
-# Load necessary libraries
-install.packages("tidyverse")
-install.packages("conflicted")
-install.packages("factoextra")
-install.packages("NbClust")
-install.packages("flexclust")
+# This script performs customer segmentation for Chestnut Ridge
+# ----------------------------------------------------
 
+# Load required libraries
 library(tidyverse)
-library(conflicted)
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(reshape2)
-library(factoextra)
 library(NbClust)
 library(flexclust)
 
-# Resolve function conflicts
-conflict_default_conflicts(strict = TRUE)
-conflict_prefer_all("tidyverse", quiet = FALSE)
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
+# ----------------------------------------------------
+# Task 1.1: Import Data and Perform Descriptive Analysis
+# ----------------------------------------------------
+retailer <- read.csv(file.choose())  # Manually select the CSV file
+summary(retailer)
+View(retailer)  # Optional: opens data viewer in RStudio
 
-# Load and inspect data
-retailer_data <- read_csv("retailer.csv.csv")
-retailer_data <- na.omit(retailer_data)
-
-# Select relevant columns and normalize
-clustering_data <- retailer_data %>%
+# ----------------------------------------------------
+# Task 1.2: Normalize Selected Variables Using Z-Score
+# ----------------------------------------------------
+selected_vars <- retailer %>%
   select(electronics, quality_of_service, low_prices, income, age)
-scaled_data <- scale(clustering_data)
 
-# Hierarchical clustering
-distance_matrix <- dist(scaled_data)
+normalized_data <- scale(selected_vars)
+summary(normalized_data)
+
+# ----------------------------------------------------
+# Task 1.3 - 1.8: Hierarchical Clustering with Ward’s Method
+# ----------------------------------------------------
+set.seed(123)
+distance_matrix <- dist(normalized_data, method = "euclidean")
 hc_model <- hclust(distance_matrix, method = "ward.D2")
 
-# Save dendrogram
-png("dendrogram_day4.png", width = 1000, height = 800)
-plot(hc_model, main = "Hierarchical Clustering Dendrogram", xlab = "", sub = "", labels = FALSE, hang = -1)
-dev.off()
+# Plot dendrogram
+plot(hc_model, main = "Dendrogram using Ward's Method", xlab = "", sub = "")
+rect.hclust(hc_model, k = 3, border = 2:4)
 
-# K-means clustering (3 clusters)
+# ----------------------------------------------------
+# Task 1.9: Number of Observations in 3 Clusters
+# ----------------------------------------------------
+# (This is shown during k-means step below)
+
+# ----------------------------------------------------
+# Task 1.10: K-Means Clustering with k = 3
+# ----------------------------------------------------
 set.seed(123)
-kmeans_model <- kmeans(scaled_data, centers = 3, nstart = 25)
-retailer_data$kmeans_cluster <- kmeans_model$cluster
-table(retailer_data$kmeans_cluster)  # Output: 70, 63, 67
+kmeans_model_3 <- kmeans(normalized_data, centers = 3, nstart = 100, iter.max = 1000)
+table(kmeans_model_3$cluster)
 
-# Visualize 3-cluster result
-fviz_cluster(kmeans_model, data = scaled_data,
-             ellipse.type = "euclid",
-             palette = "jco",
-             ggtheme = theme_minimal())
+# ----------------------------------------------------
+# Task 1.11-1.12: 4-Cluster Hierarchical and K-Means Comparison
+# ----------------------------------------------------
+# Dendrogram for 4-cluster solution
+plot(hc_model, main = "Dendrogram - 4 Clusters", xlab = "", sub = "")
+rect.hclust(hc_model, k = 4, border = 2:5)
 
-# Cluster profiling
-cluster_summary <- aggregate(clustering_data, by = list(Cluster = retailer_data$kmeans_cluster), mean)
-write.csv(cluster_summary, "cluster_summary_day5.csv", row.names = FALSE)
-
-# Bar plot of cluster means
-retailer_data$kmeans_cluster <- factor(retailer_data$kmeans_cluster)
-retailer_data_melted <- melt(retailer_data,
-                             id.vars = "kmeans_cluster",
-                             measure.vars = c("electronics", "quality_of_service", "low_prices", "income", "age"))
-
-ggplot(retailer_data_melted, aes(x = variable, y = value, fill = kmeans_cluster)) +
-  stat_summary(fun = mean, geom = "bar", position = "dodge") +
-  labs(title = "Average Variable Scores by Cluster", x = "Feature", y = "Average Value") +
-  theme_minimal()
-
-# 4-cluster solution for comparison
+# K-means with 4 clusters
 set.seed(123)
-kmeans_4 <- kmeans(scaled_data, centers = 4, iter.max = 1000, nstart = 100)
-table(kmeans_4$cluster)  # Output: 28, 67, 65, 40
+kmeans_model_4 <- kmeans(normalized_data, centers = 4, nstart = 100, iter.max = 1000)
+table(kmeans_model_4$cluster)
 
-# NbClust for optimal cluster suggestion
-set.seed(123)
-nb_results <- NbClust(scaled_data, distance = "euclidean", min.nc = 2, max.nc = 6, method = "ward.D2")
-png("nbclust_cluster_suggestion.png", width = 1000, height = 800)
-barplot(table(nb_results$Best.nc[1,]), xlab = "Number of Clusters", ylab = "Number of Criteria",
-        main = "NbClust - Cluster Number Suggestion")
-dev.off()
+# ----------------------------------------------------
+# Task 1.13: Optimal Cluster Validation with NbClust
+# ----------------------------------------------------
+nbclust_results <- NbClust(normalized_data, min.nc = 2, max.nc = 6, method = "ward.D2")
+
+# ----------------------------------------------------
+# Task 2.1: Cluster Profiling using Flexclust
+# ----------------------------------------------------
+# Attach cluster labels from K-means (3 clusters)
+cluster_labels <- kmeans_model_3$cluster
+retailer_clustered <- cbind(selected_vars, cluster = cluster_labels)
+
+# Compute average values per cluster
+cluster_means <- aggregate(. ~ cluster, data = retailer_clustered, mean)
+print(cluster_means)
 
 # Flexclust profile plot
-km_flex <- as.kcca(kmeans_model, data = scaled_data)
-png("flexclust_profile_plot.png", width = 1000, height = 800)
-plot(km_flex, main = "Cluster Profile Plot (flexclust)")
-dev.off()
+kcca_model <- as.kcca(kmeans_model_3, normalized_data)
+plot(kcca_model, data = normalized_data, main = "Flexclust Profile Plot")
+
+# ----------------------------------------------------
+# Task 2.2 and Task 3: Segment Insights and Strategy (in report)
+# ----------------------------------------------------
+# Interpretation and GE Matrix created in Word document
+
