@@ -1,4 +1,6 @@
-
+# BEMM463 Final Report - R Script
+# Candidate Number: 740054869
+# Script to perform clustering analysis and segmentation for Chestnut Ridge case study
 # Load necessary libraries
 install.packages("tidyverse")
 install.packages("conflicted")
