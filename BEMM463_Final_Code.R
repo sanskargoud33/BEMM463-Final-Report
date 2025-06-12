@@ -1,6 +1,6 @@
 # ----------------------------------------------------
 # BEMM463 Final Report - R Script
-# Candidate Number: 740054869
+# Candidate Number: 030665
 # This script performs customer segmentation for Chestnut Ridge
 # ----------------------------------------------------
 
@@ -12,7 +12,7 @@ library(flexclust)
 # ----------------------------------------------------
 # Task 1.1: Import Data and Perform Descriptive Analysis
 # ----------------------------------------------------
-retailer <- read.csv(file.choose())  # Manually select the CSV file
+retailer <- read.csv("retailer.csv")  # Ensure the file is in the working directory
 summary(retailer)
 View(retailer)  # Optional: opens data viewer in RStudio
 
@@ -20,7 +20,7 @@ View(retailer)  # Optional: opens data viewer in RStudio
 # Task 1.2: Normalize Selected Variables Using Z-Score
 # ----------------------------------------------------
 selected_vars <- retailer %>%
-  select(electronics, quality_of_service, low_prices, income, age)
+  select(variety_of_choice, electronics, furniture, quality_of_service, low_prices, return_policy)
 
 normalized_data <- scale(selected_vars)
 summary(normalized_data)
@@ -32,14 +32,15 @@ set.seed(123)
 distance_matrix <- dist(normalized_data, method = "euclidean")
 hc_model <- hclust(distance_matrix, method = "ward.D2")
 
-# Plot dendrogram
-plot(hc_model, main = "Dendrogram using Ward's Method", xlab = "", sub = "")
+# Plot dendrogram for 3 clusters
+plot(hc_model, main = "Dendrogram using Ward's Method (3 Clusters)", xlab = "", sub = "")
 rect.hclust(hc_model, k = 3, border = 2:4)
 
 # ----------------------------------------------------
 # Task 1.9: Number of Observations in 3 Clusters
 # ----------------------------------------------------
-# (This is shown during k-means step below)
+clusters_3 <- cutree(hc_model, k = 3)
+table(clusters_3)
 
 # ----------------------------------------------------
 # Task 1.10: K-Means Clustering with k = 3
@@ -54,6 +55,10 @@ table(kmeans_model_3$cluster)
 # Dendrogram for 4-cluster solution
 plot(hc_model, main = "Dendrogram - 4 Clusters", xlab = "", sub = "")
 rect.hclust(hc_model, k = 4, border = 2:5)
+
+# Hierarchical clustering with 4 clusters
+clusters_4 <- cutree(hc_model, k = 4)
+table(clusters_4)
 
 # K-means with 4 clusters
 set.seed(123)
@@ -76,6 +81,9 @@ retailer_clustered <- cbind(selected_vars, cluster = cluster_labels)
 cluster_means <- aggregate(. ~ cluster, data = retailer_clustered, mean)
 print(cluster_means)
 
+# Save to CSV (optional for report)
+write.csv(cluster_means, "cluster_means.csv", row.names = FALSE)
+
 # Flexclust profile plot
 kcca_model <- as.kcca(kmeans_model_3, normalized_data)
 plot(kcca_model, data = normalized_data, main = "Flexclust Profile Plot")
@@ -83,5 +91,6 @@ plot(kcca_model, data = normalized_data, main = "Flexclust Profile Plot")
 # ----------------------------------------------------
 # Task 2.2 and Task 3: Segment Insights and Strategy (in report)
 # ----------------------------------------------------
-# Interpretation and GE Matrix created in Word document
+# Interpretation of segments and GE Matrix evaluation to be completed in the Word report.
+
 
